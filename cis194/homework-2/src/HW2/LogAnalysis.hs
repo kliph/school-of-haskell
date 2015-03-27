@@ -40,16 +40,46 @@ parseMessage s = case (words s !! 0) of
   _ -> Unknown s
 
 parse :: String -> [LogMessage]
-parse = undefined
+parse [] = []
+parse s = (parseMessage (lines s !! 0)) : (parse (unlines (drop 1 (lines s))))
+
+getTimeStamp :: LogMessage -> Int
+getTimeStamp (LogMessage _ i _) = i
+
+getMessageString :: LogMessage -> String
+getMessageString (LogMessage _ _ s) = s
+
 
 insert :: LogMessage -> MessageTree -> MessageTree
-insert = undefined
+insert x Leaf
+  | (take 1 (show x)) == "U" = Leaf
+  | otherwise = (Node (Leaf) x (Leaf))
+insert x (Node l m r)
+  | (take 1 (show x)) == "U" = (Node l m r)
+  | getTimeStamp(x) > getTimeStamp(m) = (Node l m (insert x r))
+  | otherwise = (Node (insert x l) m r)
 
 build :: [LogMessage] -> MessageTree
-build = undefined
+build [] = Leaf
+build (x:rest) =
+  let smaller = build [a | a <- rest, getTimeStamp(a) < getTimeStamp(x)]
+      bigger = build [a | a <- rest, getTimeStamp(a) > getTimeStamp(x)]
+  in Node smaller x bigger
+-- build (x: rest) = (insert x (build rest))
+
+-- Node (Node Leaf (LogMessage Info 1 "") (Node Leaf (LogMessage (Error 9000) 2 "") Leaf)) (LogMessage Warning 3 "") Leaf
+-- Node (Node Leaf (LogMessage Info 1 "") Leaf) (LogMessage (Error 9000) 2 "") (Node Leaf (LogMessage Warning 3 "") Leaf)
 
 inOrder :: MessageTree -> [LogMessage]
-inOrder = undefined
+inOrder Leaf = []
+inOrder (Node l m r) = (inOrder l) ++ [m] ++ (inOrder r)
+
+getErrorSeverity :: LogMessage -> Int
+getErrorSeverity (LogMessage (Error i) _ _) = i
+-- Arbitrarily define non-error messages as having 0 severity
+getErrorSeverity (LogMessage m _ _) = 0
 
 whatWentWrong :: [LogMessage] -> [String]
-whatWentWrong = undefined
+whatWentWrong xs =
+  let overFifty = [a | a <- (inOrder (build xs)), getErrorSeverity(a) >= 50]
+  in map getMessageString overFifty
